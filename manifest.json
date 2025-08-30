@@ -1,0 +1,20 @@
+{
+    "name": "Issue Navigator",
+    "description": "A Chrome extension for navigating GitHub issues",
+    "version": "1.0",
+    "manifest_version": 3,
+    "action": {
+        "default_popup": "src/index.html"
+    },
+    "content_scripts": [
+        {
+            "js": [
+                "src/navigator.js"
+            ],
+            "matches": [
+                "https://github.com/*"
+            ],
+            "run_at": "document_start"
+        }
+    ]
+}
