@@ -4,8 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script defer src="script.js"></script>
     <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://rsms.me/">
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
     <title>Issue Navigator</title>
 </head>
 
@@ -16,11 +17,44 @@
     </div>
 
     <!-- Main Content -->
-    <div id="main-content">
-        <h4>Use the buttons or keybinds to navigate between issues or PRs. Settings for navigation
-            can be adjusted below.</h4>
-    </div>
+    <div id="settings">
+        <label>
+            Next key:
+            <input id="nextKey" class="key-input">
+        </label>
 
+        <label>
+            Prev key:
+            <input id="prevKey" class="key-input">
+        </label>
+
+        <div class="buttonSetting">
+            <label>
+                Restrict navigation to current type (issues or pulls only):
+            </label>
+
+            <div>
+                <button id="restrictAll" class="toggle-button">All</button>
+                <button id="restrictCurrent" class="toggle-button">Current</button>
+            </div>
+        </div>
+
+        <div class="buttonSetting">
+            <label>
+                Filter by issue status:
+            </label>
+            <div>
+                <button id="filterAll" class="toggle-button">All</button>
+                <button id="filterOpen" class="toggle-button">Open</button>
+                <button id="filterClosed" class="toggle-button">Closed</button>
+            </div>
+        </div>
+
+
+        <span id="status-message"></span>
+        <button id="save">Save</button>
+    </div>
+    <script type="module" src="./popout.js"></script>
 </body>
 
 </html>

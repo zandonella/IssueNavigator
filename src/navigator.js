@@ -4,8 +4,30 @@ console.log(location.pathname);
 let lastPathname = null;
 let observer = null;
 
+let SETTINGS;
+let getSettings;
 
-// setup functions 
+(async () => {
+    // dynamic import
+    ({ getSettings } = await import(chrome.runtime.getURL("src/settings.js")));
+    SETTINGS = await getSettings();
+
+    await init();
+})();
+
+// setup functions
+async function init() {
+    chrome.storage.onChanged.addListener(async (changes, area) => {
+        if (area !== "sync") return;
+        SETTINGS = await getSettings();
+        console.log("Settings updated:", SETTINGS);
+    });
+
+    document.addEventListener("turbo:render", onRouteChange);
+    window.addEventListener("popstate", onRouteChange);
+    attachObserver();
+    onRouteChange();
+}
 
 // update when the SPA route changes
 function onRouteChange() {
@@ -26,17 +48,14 @@ function attachObserver() {
     observer.observe(container, { childList: true, subtree: true });
 }
 
-document.addEventListener("turbo:load", onRouteChange);
-document.addEventListener("turbo:render", onRouteChange);
-window.addEventListener("popstate", onRouteChange);
-
-attachObserver();
-onRouteChange();
-
 
 // navigation
 
 function navigate(direction) {
+    if (!isValidPath(location.pathname)) {
+        console.log("Invalid path");
+        return;
+    }
     if (direction === "next") {
         console.log("Navigating to next issue...");
     } else if (direction === "prev") {
@@ -44,23 +63,23 @@ function navigate(direction) {
     }
 }
 
+function isValidPath(string) {
+    return /[^\/]+\/[^\/]+\/(issues|pull)\/\d+/.test(string);
+}
 
 
 // add keybind listener
 window.addEventListener("keyup", function (e) {
     if (isTypingTarget(document.activeElement)) return;
 
-    if (e.key === "ArrowRight") {
+    if (e.key === SETTINGS.nextKey) {
         e.preventDefault();
         navigate("next");
-    } else if (e.key === "ArrowLeft") {
+    } else if (e.key === SETTINGS.prevKey) {
         e.preventDefault();
         navigate("prev");
     }
 });
-
-
-
 
 // helpers
 
