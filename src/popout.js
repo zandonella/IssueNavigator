@@ -1,4 +1,4 @@
-import { getSettings } from "./settings.js";
+import { getSettings, captureKeyCombo } from "./settings.js";
 
 
 async function loadSettings() {
@@ -90,6 +90,19 @@ settingsContainer.addEventListener("click", (event) => {
     if (button.classList.contains("toggle-button")) {
         handleToggleButtonClick(button);
     }
+});
+
+let nextKeyInput = document.querySelector("#nextKey");
+let prevKeyInput = document.querySelector("#prevKey");
+
+nextKeyInput.addEventListener("keydown", (e) => {
+    e.preventDefault();
+    nextKeyInput.value = captureKeyCombo(e);
+});
+
+prevKeyInput.addEventListener("keydown", (e) => {
+    e.preventDefault();
+    prevKeyInput.value = captureKeyCombo(e);
 });
 
 document.querySelector("#save").addEventListener("click", saveSettings);

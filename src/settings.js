@@ -11,3 +11,18 @@ export async function getSettings() {
     console.log("Settings loaded:", { ...DEFAULT_SETTINGS, ...saved.SETTINGS });
     return { ...DEFAULT_SETTINGS, ...saved.SETTINGS };
 }
+
+export function captureKeyCombo(e) {
+    let keyCombo = []
+
+    if (e.ctrlKey) keyCombo.push("Ctrl");
+    if (e.shiftKey) keyCombo.push("Shift");
+    if (e.altKey) keyCombo.push("Alt");
+    if (e.metaKey) keyCombo.push("Meta");
+
+    if (!["Shift", "Control", "Alt", "Meta"].includes(e.key)) {
+        keyCombo.push(e.key);
+    }
+
+    return keyCombo.join("+");
+}
