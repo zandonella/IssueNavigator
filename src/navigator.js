@@ -1,5 +1,4 @@
 console.log("Script loaded.");
-console.log(location.pathname);
 
 let lastPathname = null;
 let observer = null;
@@ -7,9 +6,12 @@ let observer = null;
 let SETTINGS;
 let getSettings;
 
+URL_REGEX = /\/([^\/]+)\/([^\/]+)\/(issues|pull|discussions)\/(\d+)/;
+
 (async () => {
     // dynamic import
-    ({ getSettings } = await import(chrome.runtime.getURL("src/settings.js")));
+    ({ getSettings, captureKeyCombo } = await import(chrome.runtime.getURL("src/settings.js")));
+
     SETTINGS = await getSettings();
 
     await init();
@@ -48,34 +50,71 @@ function attachObserver() {
     observer.observe(container, { childList: true, subtree: true });
 }
 
+// api helpers
+
+function parseRepoPath(path) {
+    const match = path.match(URL_REGEX);
+    if (!match) return null;
+    console.log("Parsed path:", match);
+    return {
+        owner: match[1],
+        repo: match[2],
+        type: match[3],
+        number: parseInt(match[4])
+    };
+}
+
+// async function fetchIssueOrPR(owner, repo, number) {
+//     const url = `https://api.github.com/repos/${owner}/${repo}/issues`;
+//     const response = await fetch(url);
+//     if (!response.ok) {
+//         console.error("Failed to fetch issues:", response.statusText);
+//         return null;
+//     }
+//     const data = await response.json();
+//     console.log("Fetched issue/PR data:", data);
+//     return data;
+// }
+
+// fetchIssueOrPR("openstreetmap", "iD", 11369);
 
 // navigation
+
+function goToIssue(owner, repo, number) {
+    const url = `https://github.com/${owner}/${repo}/issues/${number}`;
+    window.location.href = url;
+}
 
 function navigate(direction) {
     if (!isValidPath(location.pathname)) {
         console.log("Invalid path");
         return;
     }
+    const { owner, repo, number } = parseRepoPath(location.pathname);
     if (direction === "next") {
         console.log("Navigating to next issue...");
+        console.log(owner, repo, number);
+        goToIssue(owner, repo, number + 1);
     } else if (direction === "prev") {
         console.log("Navigating to previous issue...");
+        goToIssue(owner, repo, number - 1);
     }
 }
 
 function isValidPath(string) {
-    return /[^\/]+\/[^\/]+\/(issues|pull)\/\d+/.test(string);
+    return URL_REGEX.test(string);
 }
 
 
 // add keybind listener
 window.addEventListener("keyup", function (e) {
     if (isTypingTarget(document.activeElement)) return;
+    const keyCombo = captureKeyCombo(e);
 
-    if (e.key === SETTINGS.nextKey) {
+    if (keyCombo === SETTINGS.nextKey) {
         e.preventDefault();
         navigate("next");
-    } else if (e.key === SETTINGS.prevKey) {
+    } else if (keyCombo === SETTINGS.prevKey) {
         e.preventDefault();
         navigate("prev");
     }
