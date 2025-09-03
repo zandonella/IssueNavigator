@@ -64,19 +64,50 @@ function parseRepoPath(path) {
     };
 }
 
-// async function fetchIssueOrPR(owner, repo, number) {
-//     const url = `https://api.github.com/repos/${owner}/${repo}/issues`;
-//     const response = await fetch(url);
-//     if (!response.ok) {
-//         console.error("Failed to fetch issues:", response.statusText);
-//         return null;
-//     }
-//     const data = await response.json();
-//     console.log("Fetched issue/PR data:", data);
-//     return data;
-// }
+function buildURL(owner, repo, type, params = {}) {
+    const baseURL = `https://api.github.com/repos/${owner}/${repo}/${type}`;
+    const url = new URL(baseURL);
 
-// fetchIssueOrPR("openstreetmap", "iD", 11369);
+    Object.keys(params).forEach(key => {
+        console.log("Appending param:", key, params[key]);
+        url.searchParams.append(key, params[key]);
+    });
+
+    return url
+}
+
+async function callAPI(URL) {
+    const response = await fetch(URL);
+    if (!response.ok) {
+        console.error("Failed to fetch issues/PRs:", response.statusText);
+        return null;
+    }
+    const data = await response.json();
+    return data;
+}
+
+async function getAPIData(owner, repo, type) {
+    if (type === "pull" && SETTINGS.type === "current") {
+        let URL = buildURL(owner, repo, "pulls", {
+            state: SETTINGS.status,
+            per_page: 5
+        });
+        return await callAPI(URL);
+    } else if (type === "issues" && SETTINGS.type === "current") {
+        let URL = buildURL(owner, repo, "issues", {
+            state: SETTINGS.status,
+            per_page: 5
+        });
+        let data = await callAPI(URL)
+        return data.filter(item => !item.pull_request);
+    } else {
+        let URL = buildURL(owner, repo, "issues", {
+            state: SETTINGS.status,
+            per_page: 5
+        });
+        return await callAPI(URL);
+    }
+}
 
 // navigation
 
@@ -85,19 +116,21 @@ function goToIssue(owner, repo, number) {
     window.location.href = url;
 }
 
-function navigate(direction) {
+async function navigate(direction) {
     if (!isValidPath(location.pathname)) {
         console.log("Invalid path");
         return;
     }
-    const { owner, repo, number } = parseRepoPath(location.pathname);
+
+    const { owner, repo, type } = parseRepoPath(location.pathname);
+    console.log("Navigating in:", owner, repo, type);
+    let apiData = await getAPIData(owner, repo, type);
+    console.log("API Data:", apiData);
+
     if (direction === "next") {
-        console.log("Navigating to next issue...");
-        console.log(owner, repo, number);
-        goToIssue(owner, repo, number + 1);
+        console.log("Fetching issues with settings:", SETTINGS);
     } else if (direction === "prev") {
         console.log("Navigating to previous issue...");
-        goToIssue(owner, repo, number - 1);
     }
 }
 

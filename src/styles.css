@@ -3,18 +3,20 @@
 }
 
 html {
-    width: 300px;
+    width: 310px;
     height: 350px;
     background-color: #f1f1f1;
+    overflow: hidden;
 }
 
 body {
-    width: 300px;
-    height: 300px;
     position: absolute;
     margin: 0;
     padding: 8px;
     box-sizing: border-box;
+    overflow-y: auto;
+    height: 100%;
+    width: 310px;
 }
 
 h1,
@@ -50,6 +52,7 @@ label {
     display: flex;
     justify-content: center;
     align-items: center;
+    padding-top: 0px;
 }
 
 #header>h1 {
@@ -105,5 +108,43 @@ input.key-input {
 #status-message {
     color: red;
     font-size: 12px;
-    height: 16px;
+}
+
+.signup-github {
+    background-color: #111827;
+    color: #f3f4f6;
+    font-weight: bold;
+    font-size: 14px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1),
+        0 1px 2px rgba(0, 0, 0, 0.06);
+    transition: color 0.2s ease;
+}
+
+.signup-github:hover {
+    color: #ffffff;
+}
+
+.signup-icon {
+    fill: currentColor;
+    margin-right: 12px;
+    width: 24px;
+    height: 24px;
+}
+
+.signup-divider {
+    border-left: 1px solid #1f2937;
+    height: 24px;
+    width: 4px;
+    display: block;
+    margin-right: 4px;
+}
+
+.signup-text {
+    padding-left: 12px;
 }
