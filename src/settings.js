@@ -1,9 +1,11 @@
 const DEFAULT_SETTINGS = {
     nextKey: "ArrowRight",
     prevKey: "ArrowLeft",
-    type: "Current",
-    status: "All"
+    type: "current",
+    status: "open"
 };
+
+export const CLIENT_ID = "Ov23li1pXJ9BNmqQR6hB";
 
 export async function getSettings() {
     console.log("Loading settings...");

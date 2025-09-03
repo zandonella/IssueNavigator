@@ -81,6 +81,33 @@ function handleToggleButtonClick(button) {
     button.classList.add("active");
 }
 
+// auth
+
+// 
+
+async function getDeviceCode() {
+    const res = await fetch('https://github.com/login/device/code', {
+        method: 'POST',
+        headers: { "Content-Type": "application/x-www-form-urlencoded", 'Accept': 'application/json' },
+        body: `client_id=${CLIENT_ID}&scope=repo`
+    });
+    return await res.json();
+}
+
+
+document.getElementById('authenticate').onclick = async () => {
+    const deviceData = await getDeviceCode();
+    console.log("Device data:", deviceData);
+
+    chrome.runtime.sendMessage({ type: "start_poll", device_code: deviceData.device_code });
+
+    chrome.tabs.create({
+        url: chrome.runtime.getURL(
+            `src/deviceAuth.html?verification_uri=${encodeURIComponent(deviceData.verification_uri)}&user_code=${encodeURIComponent(deviceData.user_code)}`
+        )
+    });
+};
+
 
 // attach event listeners
 const settingsContainer = document.querySelector("#settings");

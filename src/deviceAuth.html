@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>GitHub Device Auth</title>
+</head>
+
+<style>
+    body {
+        font-family: Inter, sans-serif;
+    }
+
+    h2 {
+        color: #333;
+    }
+
+    a {
+        color: #007bff;
+        text-decoration: none;
+    }
+
+    a:hover {
+        text-decoration: underline;
+    }
+
+    .success {
+        color: green;
+    }
+
+    .error {
+        color: red;
+    }
+</style>
+
+<body>
+    <h2>GitHub Authentication</h2>
+    <p>Go to: <a id="verification_uri" target="_blank"></a></p>
+    <p>Your code: <b><span id="user_code"></span></b></p>
+    <p>After authorizing, return to the extension.</p>
+    <div id="result"></div>
+    <script src="deviceAuth.js"></script>
+</body>
+
+</html>

@@ -3,9 +3,18 @@
     "description": "A Chrome extension for navigating GitHub issues",
     "version": "1.0",
     "permissions": [
-        "storage"
+        "storage",
+        "tabs"
     ],
     "manifest_version": 3,
+    "background": {
+        "service_worker": "src/background.js",
+        "type": "module"
+    },
+    "host_permissions": [
+        "https://github.com/*",
+        "https://api.github.com/*"
+    ],
     "action": {
         "default_popup": "src/index.html"
     },
