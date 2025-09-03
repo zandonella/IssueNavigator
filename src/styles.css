@@ -108,6 +108,7 @@ input.key-input {
 #status-message {
     color: red;
     font-size: 12px;
+    display: none;
 }
 
 .signup-github {
@@ -119,6 +120,22 @@ input.key-input {
     border-radius: 6px;
     display: flex;
     justify-content: flex-start;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1),
+        0 1px 2px rgba(0, 0, 0, 0.06);
+    transition: color 0.2s ease;
+}
+
+.logout-github {
+    background-color: #f3f4f6;
+    color: #EE4B2B;
+    font-weight: bold;
+    font-size: 14px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
     align-items: center;
     cursor: pointer;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1),
@@ -147,4 +164,12 @@ input.key-input {
 
 .signup-text {
     padding-left: 12px;
+}
+
+.logout-text {
+    padding-left: 0px;
+}
+
+.hidden {
+    display: none;
 }

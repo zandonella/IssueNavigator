@@ -1,4 +1,4 @@
-import { getSettings, captureKeyCombo, CLIENT_ID } from "./settings.js";
+import { getSettings, captureKeyCombo, CLIENT_ID, hasToken, logout } from "./settings.js";
 
 async function loadSettings() {
     const settings = await getSettings();
@@ -16,6 +16,7 @@ async function loadSettings() {
 
 function setStatusMessage(message) {
     const statusMessage = document.querySelector("#status-message");
+    statusMessage.style.display = message ? "block" : "none";
     statusMessage.textContent = message;
 }
 
@@ -64,6 +65,7 @@ async function saveSettings() {
     };
 
     console.log("Saving settings:", SETTINGS);
+    setStatusMessage();
 
     await chrome.storage.sync.set({ SETTINGS });
 }
@@ -80,9 +82,56 @@ function handleToggleButtonClick(button) {
     button.classList.add("active");
 }
 
-// auth
+function updateAuthButton(loggedIn) {
+    const authButton = document.getElementById('authenticate');
+    const text = document.getElementById("button-text");
+    const icon = authButton.querySelector("svg");
+    const divider = authButton.querySelector(".signup-divider");
 
-// 
+    authButton.onclick = null
+
+    if (loggedIn) {
+        text.textContent = 'Logout';
+        text.classList.remove('signup-text');
+        text.classList.add('logout-text');
+
+        authButton.classList.add('logout-github');
+        authButton.classList.remove('signup-github');
+
+        icon.classList.add('hidden');
+        divider.classList.add('hidden');
+
+        authButton.onclick = async () => {
+            await logout();
+            setStatusMessage('Signed out.');
+            updateAuthButton(false);
+        };
+    } else {
+        text.textContent = 'Login with GitHub';
+        text.classList.remove('logout-text');
+        text.classList.add('signup-text');
+
+        authButton.classList.remove('logout-github');
+        authButton.classList.add('signup-github');
+
+        icon.classList.remove('hidden');
+        divider.classList.remove('hidden');
+
+        authButton.onclick = async () => {
+            const deviceData = await getDeviceCode();
+
+            chrome.runtime.sendMessage({ type: "start_poll", device_code: deviceData.device_code });
+
+            chrome.tabs.create({
+                url: chrome.runtime.getURL(
+                    `src/deviceAuth.html?verification_uri=${encodeURIComponent(deviceData.verification_uri)}&user_code=${encodeURIComponent(deviceData.user_code)}`
+                )
+            });
+        };
+    }
+}
+
+// auth
 
 async function getDeviceCode() {
     const res = await fetch('https://github.com/login/device/code', {
@@ -93,22 +142,13 @@ async function getDeviceCode() {
     return await res.json();
 }
 
-
-document.getElementById('authenticate').onclick = async () => {
-    const deviceData = await getDeviceCode();
-    console.log("Device data:", deviceData);
-
-    chrome.runtime.sendMessage({ type: "start_poll", device_code: deviceData.device_code });
-
-    chrome.tabs.create({
-        url: chrome.runtime.getURL(
-            `src/deviceAuth.html?verification_uri=${encodeURIComponent(deviceData.verification_uri)}&user_code=${encodeURIComponent(deviceData.user_code)}`
-        )
-    });
-};
-
-
 // attach event listeners
+
+chrome.storage.onChanged.addListener(async (changes, area) => {
+
+    hasToken().then(updateAuthButton);
+});
+
 const settingsContainer = document.querySelector("#settings");
 settingsContainer.addEventListener("click", (event) => {
     const button = event.target;
@@ -133,3 +173,4 @@ prevKeyInput.addEventListener("keydown", (e) => {
 
 document.querySelector("#save").addEventListener("click", saveSettings);
 document.addEventListener("DOMContentLoaded", loadSettings);
+hasToken().then(updateAuthButton);

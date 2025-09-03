@@ -28,3 +28,17 @@ export function captureKeyCombo(e) {
 
     return keyCombo.join("+");
 }
+
+export async function hasToken() {
+    const github_token = await getToken();
+    return !!github_token;
+}
+
+export async function logout() {
+    await chrome.storage.local.remove("github_token");
+}
+
+export async function getToken() {
+    const { github_token } = await chrome.storage.local.get("github_token");
+    return github_token;
+}
