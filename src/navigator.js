@@ -1,6 +1,7 @@
 console.log("Script loaded.");
 
 let lastPathname = null;
+let lastSearch = null
 let observer = null;
 
 let SETTINGS;
@@ -25,6 +26,8 @@ async function init() {
         console.log("Settings updated:", SETTINGS);
     });
 
+
+
     document.addEventListener("turbo:render", onRouteChange);
     window.addEventListener("popstate", onRouteChange);
     attachObserver();
@@ -34,12 +37,48 @@ async function init() {
 // update when the SPA route changes
 function onRouteChange() {
     const currentPathname = location.pathname;
+    const currentSearch = location.search;
+
+    if (currentSearch !== lastSearch) {
+        lastSearch = currentSearch;
+        getURLParams();
+    }
     if (currentPathname !== lastPathname) {
         lastPathname = currentPathname;
         console.log("Route changed to:", currentPathname);
         attachObserver();
     }
 }
+
+// todo find a way to capture when this changes
+async function getURLParams() {
+    issuesPageRegex = /\/([^\/]+)\/([^\/]+)\/(issues|pulls)$/;
+    if (!issuesPageRegex.test(location.pathname)) {
+        console.log("Not on issues/pr list page");
+        return;
+    }
+
+    const queryString = window.location.search;
+    const params = new URLSearchParams(queryString);
+    console.log("URL params:", params.toString());
+
+    let sortSetting = "created-desc";
+
+    if (params.has("q")) {
+        const options = params.get("q");
+        const decoded = decodeURIComponent(options);
+        const match = decoded.match(/sort:([^\s]+)/);
+        if (match) {
+            sortSetting = match[1];
+        }
+    }
+
+    if (sortSetting !== SETTINGS.sort + "-" + SETTINGS.direction) {
+        await chrome.storage.sync.set({ SETTINGS: { ...SETTINGS, sort: sortSetting.split("-")[0], direction: sortSetting.split("-")[1] } });
+        console.log("Updated sort setting:", sortSetting);
+    }
+}
+
 // attach the observer to the container
 function attachObserver() {
     const container = document.body;
@@ -64,7 +103,7 @@ function parseRepoPath(path) {
     };
 }
 
-function buildURL(owner, repo, type, params = {}) {
+function buildRepoURL(owner, repo, type, params = {}) {
     const baseURL = `https://api.github.com/repos/${owner}/${repo}/${type}`;
     const url = new URL(baseURL);
 
@@ -88,25 +127,37 @@ async function callAPI(URL) {
 
 async function getAPIData(owner, repo, type) {
     if (type === "pull" && SETTINGS.type === "current") {
-        let URL = buildURL(owner, repo, "pulls", {
+        let URL = buildRepoURL(owner, repo, "pulls", {
             state: SETTINGS.status,
-            per_page: 5
+            per_page: 50,
+            sort: SETTINGS.sort,
+            direction: SETTINGS.direction
         });
         return await callAPI(URL);
-    } else if (type === "issues" && SETTINGS.type === "current") {
-        let URL = buildURL(owner, repo, "issues", {
-            state: SETTINGS.status,
-            per_page: 5
-        });
-        let data = await callAPI(URL)
-        return data.filter(item => !item.pull_request);
     } else {
-        let URL = buildURL(owner, repo, "issues", {
+        let URL = buildRepoURL(owner, repo, "issues", {
             state: SETTINGS.status,
-            per_page: 5
+            per_page: 50,
+            sort: SETTINGS.sort,
+            direction: SETTINGS.direction
         });
+        console.log("Fetching from URL:", URL.toString());
         return await callAPI(URL);
     }
+}
+
+
+function filterAPIData(data, type, status) {
+    if (type === "issues" && SETTINGS.type === "current") {
+        data = data.filter(item => !item.pull_request);
+    }
+    if (status === "open") {
+        data = data.filter(item => item.state === "open");
+    } else if (status === "closed") {
+        data = data.filter(item => item.state === "closed");
+    }
+
+    return data;
 }
 
 // navigation
@@ -125,6 +176,7 @@ async function navigate(direction) {
     const { owner, repo, type } = parseRepoPath(location.pathname);
     console.log("Navigating in:", owner, repo, type);
     let apiData = await getAPIData(owner, repo, type);
+    apiData = filterAPIData(apiData, type, SETTINGS.status);
     console.log("API Data:", apiData);
 
     if (direction === "next") {
