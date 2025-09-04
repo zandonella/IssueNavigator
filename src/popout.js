@@ -12,6 +12,8 @@ async function loadSettings() {
 
     document.querySelector(`#restrict-${settings.type}`).classList.add("active");
     document.querySelector(`#filter-${settings.status}`).classList.add("active");
+    document.querySelector(`#sort-${settings.sort}`).classList.add("active");
+    document.querySelector(`#sort-${settings.direction}`).classList.add("active");
 }
 
 function setStatusMessage(message) {
@@ -42,6 +44,20 @@ async function saveSettings() {
         status = "closed";
     }
 
+    let sort = null;
+    if (document.querySelector("#sort-created").classList.contains("active")) {
+        sort = "created";
+    } else if (document.querySelector("#sort-updated").classList.contains("active")) {
+        sort = "updated";
+    }
+
+    let direction = null;
+    if (document.querySelector("#sort-desc").classList.contains("active")) {
+        direction = "desc";
+    } else if (document.querySelector("#sort-asc").classList.contains("active")) {
+        direction = "asc";
+    }
+
     if (!nextKey || !prevKey) {
         setStatusMessage("Both Next and Prev keys must be set.");
         return;
@@ -57,11 +73,23 @@ async function saveSettings() {
         return;
     }
 
+    if (!sort) {
+        setStatusMessage("Sort option must be selected.");
+        return;
+    }
+
+    if (!direction) {
+        setStatusMessage("Sort direction must be selected.");
+        return;
+    }
+
     const SETTINGS = {
         nextKey,
         prevKey,
         type,
         status,
+        sort,
+        direction
     };
 
     console.log("Saving settings:", SETTINGS);

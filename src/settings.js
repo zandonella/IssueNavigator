@@ -2,7 +2,9 @@ const DEFAULT_SETTINGS = {
     nextKey: "ArrowRight",
     prevKey: "ArrowLeft",
     type: "current",
-    status: "open"
+    status: "open",
+    sort: "created",
+    direction: "desc"
 };
 
 export const CLIENT_ID = "Ov23li1pXJ9BNmqQR6hB";
