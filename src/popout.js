@@ -1,4 +1,4 @@
-import { getSettings, captureKeyCombo, CLIENT_ID, hasToken, logout } from "./settings.js";
+import { getSettings, captureKeyCombo, CLIENT_ID, hasToken, logout, getToken } from "./settings.js";
 
 async function loadSettings() {
     const settings = await getSettings();
@@ -156,6 +156,32 @@ function updateAuthButton(loggedIn) {
                 )
             });
         };
+    }
+    getRateLimit();
+}
+
+async function getRateLimit() {
+    const token = await getToken();
+
+    const headers = { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `Bearer ${token}` }) };
+
+    console.log("Fetching rate limit with headers:", headers);
+
+    const data = await fetch('https://api.github.com/rate_limit', { headers }).then(res => res.json());
+
+
+    const rateInfo = data.resources.core;
+    const remaining = rateInfo.remaining;
+    const limit = rateInfo.limit;
+
+    document.getElementById("rateLimit").textContent = `${remaining}`;
+
+    if (remaining > limit * 0.5) {
+        document.getElementById("rateLimit").style.color = "green";
+    } else if (remaining > limit * 0.2) {
+        document.getElementById("rateLimit").style.color = "orange";
+    } else {
+        document.getElementById("rateLimit").style.color = "red";
     }
 }
 

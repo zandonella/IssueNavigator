@@ -173,3 +173,10 @@ input.key-input {
 .hidden {
     display: none;
 }
+
+#rateLimit {
+    position: absolute;
+    right: 16px;
+    top: 15px;
+    font-size: 12px;
+}
