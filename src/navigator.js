@@ -6,12 +6,13 @@ let observer = null;
 
 let SETTINGS;
 let getSettings;
+const SESSION = chrome.storage.session;
 
 URL_REGEX = /\/([^\/]+)\/([^\/]+)\/(issues|pull|discussions)\/(\d+)/;
 
 (async () => {
     // dynamic import
-    ({ getSettings, captureKeyCombo } = await import(chrome.runtime.getURL("src/settings.js")));
+    ({ getSettings, captureKeyCombo, getToken } = await import(chrome.runtime.getURL("src/settings.js")));
 
     SETTINGS = await getSettings();
 
@@ -115,35 +116,65 @@ function buildRepoURL(owner, repo, type, params = {}) {
     return url
 }
 
+// calls api and returns the response
 async function callAPI(URL) {
-    const response = await fetch(URL);
+    const token = await getToken();
+    const headers = { ...(token && { 'Authorization': `Bearer ${token}` }) };
+
+    const response = await fetch(URL, { headers });
     if (!response.ok) {
         console.error("Failed to fetch issues/PRs:", response.statusText);
         return null;
     }
-    const data = await response.json();
-    return data;
+    return response;
 }
 
-async function getAPIData(owner, repo, type) {
-    if (type === "pull" && SETTINGS.type === "current") {
-        let URL = buildRepoURL(owner, repo, "pulls", {
+async function getAPIData(owner, repo, type, pageURL = null) {
+    let URL;
+    if (pageURL) {
+        URL = pageURL;
+    } else if (type === "pull" && SETTINGS.type === "current") {
+        URL = buildRepoURL(owner, repo, "pulls", {
             state: SETTINGS.status,
             per_page: 50,
             sort: SETTINGS.sort,
             direction: SETTINGS.direction
         });
-        return await callAPI(URL);
     } else {
-        let URL = buildRepoURL(owner, repo, "issues", {
+        URL = buildRepoURL(owner, repo, "issues", {
             state: SETTINGS.status,
             per_page: 50,
             sort: SETTINGS.sort,
             direction: SETTINGS.direction
         });
-        console.log("Fetching from URL:", URL.toString());
-        return await callAPI(URL);
     }
+
+    console.log("Fetching from URL:", URL.toString());
+    let response = await callAPI(URL);
+    let data = await response.json();
+    const linkHeader = response.headers.get("Link");
+    console.log("linkHeader info:", linkHeader);
+    const { next, prev } = parseHeaderLinks(linkHeader);
+
+    return { apiData: data, ...{ next, prev } };
+}
+
+function parseHeaderLinks(header) {
+    let links = { next: null, prev: null };
+    if (!header) return links;
+
+    const linkHeader = header.split(", ");
+    linkHeader.forEach(link => {
+        const match = link.match(/<(.*?)>; rel="(.*?)"/);
+        if (match) {
+            const url = match[1];
+            const rel = match[2];
+            if (rel === "next") links.next = url;
+            if (rel === "prev") links.prev = url;
+        }
+    });
+
+    return links;
 }
 
 
@@ -173,16 +204,57 @@ async function navigate(direction) {
         return;
     }
 
-    const { owner, repo, type } = parseRepoPath(location.pathname);
+    const { owner, repo, type, number } = parseRepoPath(location.pathname);
     console.log("Navigating in:", owner, repo, type);
-    let apiData = await getAPIData(owner, repo, type);
-    apiData = filterAPIData(apiData, type, SETTINGS.status);
-    console.log("API Data:", apiData);
 
-    if (direction === "next") {
-        console.log("Fetching issues with settings:", SETTINGS);
-    } else if (direction === "prev") {
-        console.log("Navigating to previous issue...");
+    let nextPageURL = null;
+    let prevPageURL = null;
+    let numbers = [];
+    let fetchedNumbers = [];
+    let firstFetch = true;
+    while (!fetchedNumbers.includes(number)) {
+        console.log("Current number not in fetched data, fetching more...");
+        numbers = numbers.concat(fetchedNumbers);
+
+        const { apiData, next, prev } = await getAPIData(
+            owner,
+            repo,
+            type,
+            firstFetch ? null : direction === "next" ? nextPageURL : prevPageURL
+        );
+
+        fetchedNumbers = filterAPIData(apiData, type, SETTINGS.status).map(item => item.number);
+        console.log("Fetched numbers:", fetchedNumbers);
+
+        if (fetchedNumbers.length === 0) {
+            console.log("No more data available.");
+            break;
+        }
+
+        nextPageURL = next;
+        prevPageURL = prev;
+        firstFetch = false;
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+
+    numbers = numbers.concat(fetchedNumbers);
+    console.log("Collected numbers:", numbers);
+
+    console.log(
+        direction === "next" ? "Fetching next issues..." : "Fetching previous issues..."
+    );
+
+    const currentIndex = numbers.indexOf(number);
+}
+
+function getIssueNumber(numbers, currentIndex, direction) {
+    const nextIndex = currentIndex + 1;
+    const prevIndex = currentIndex - 1;
+    if (direction === "next" && nextIndex < numbers.length) {
+        return numbers[nextIndex] || null;
+    } else if (direction === "prev" && prevIndex >= 0) {
+        return numbers[prevIndex] || null;
     }
 }
 
@@ -215,4 +287,15 @@ function isTypingTarget(el) {
     var role = el.getAttribute ? el.getAttribute("role") : null;
     if (role === "textbox" || role === "searchbox" || role === "combobox") return true;
     return false;
+}
+
+// cache helpers
+
+function makeFilterKey(owner, repo, type) {
+    return `${owner}/${repo}/${type}:-${SETTINGS.status}-${SETTINGS.sort}-${SETTINGS.direction}`;
+}
+
+async function saveIssueList(owner, repo, type, numbers) {
+    const key = makeFilterKey(owner, repo, type);
+    await SESSION.set({ [key]: { numbers } });
 }
