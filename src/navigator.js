@@ -7,6 +7,7 @@ let observer = null;
 let SETTINGS;
 let getSettings;
 const SESSION = chrome.storage.session;
+let ISSUE_LIST = [];
 
 URL_REGEX = /\/([^\/]+)\/([^\/]+)\/(issues|pull|discussions)\/(\d+)/;
 
@@ -26,8 +27,6 @@ async function init() {
         SETTINGS = await getSettings();
         console.log("Settings updated:", SETTINGS);
     });
-
-
 
     document.addEventListener("turbo:render", onRouteChange);
     window.addEventListener("popstate", onRouteChange);
@@ -198,6 +197,55 @@ function goToIssue(owner, repo, number) {
     window.location.href = url;
 }
 
+async function fetchPageofNums(owner, repo, type, pageURL = null) {
+    const { apiData, next, prev } = await getAPIData(
+        owner,
+        repo,
+        type,
+        pageURL
+    );
+
+    fetchedNumbers = filterAPIData(apiData, type, SETTINGS.status).map(item => item.number);
+
+    return { fetchedNumbers, next, prev };
+}
+
+async function findNumberInList(owner, repo, type, number, direction) {
+    let nextPageURL = null;
+    let prevPageURL = null;
+    let numbers = [];
+    while (true) {
+        console.log("Current number not in fetched data, fetching new page...");
+
+        const pageURL = direction === "next" ? nextPageURL : prevPageURL;
+        const { fetchedNumbers, next, prev } = await fetchPageofNums(
+            owner,
+            repo,
+            type,
+            pageURL
+        );
+
+        numbers.push(...fetchedNumbers);
+        nextPageURL = next;
+        prevPageURL = prev;
+
+        console.log("Fetched numbers:", fetchedNumbers);
+        if (fetchedNumbers.length === 0) {
+            console.log("No more data available.");
+            break;
+        }
+
+        if (fetchedNumbers.includes(number)) {
+            console.log("Found current number in fetched data.");
+            break;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+
+    return { numbers, nextPageURL, prevPageURL };
+}
+
 async function navigate(direction) {
     if (!isValidPath(location.pathname)) {
         console.log("Invalid path");
@@ -209,52 +257,84 @@ async function navigate(direction) {
 
     let nextPageURL = null;
     let prevPageURL = null;
-    let numbers = [];
-    let fetchedNumbers = [];
-    let firstFetch = true;
-    while (!fetchedNumbers.includes(number)) {
-        console.log("Current number not in fetched data, fetching more...");
-        numbers = numbers.concat(fetchedNumbers);
+    let listChanged = false;
 
-        const { apiData, next, prev } = await getAPIData(
-            owner,
-            repo,
-            type,
-            firstFetch ? null : direction === "next" ? nextPageURL : prevPageURL
-        );
-
-        fetchedNumbers = filterAPIData(apiData, type, SETTINGS.status).map(item => item.number);
-        console.log("Fetched numbers:", fetchedNumbers);
-
-        if (fetchedNumbers.length === 0) {
-            console.log("No more data available.");
-            break;
-        }
-
-        nextPageURL = next;
-        prevPageURL = prev;
-        firstFetch = false;
-
-        await new Promise(resolve => setTimeout(resolve, 2000));
+    // load from cache
+    let response = await loadIssueList(owner, repo, type);
+    if (response) {
+        ISSUE_LIST = response.numbers;
+        nextPageURL = response.nextPageURL;
+        prevPageURL = response.prevPageURL;
+    } else {
+        // fallback to API
+        listChanged = true;
+        response = await findNumberInList(owner, repo, type, number, direction);
+        ISSUE_LIST = response.numbers;
+        nextPageURL = response.nextPageURL;
+        prevPageURL = response.prevPageURL;
     }
 
-    numbers = numbers.concat(fetchedNumbers);
-    console.log("Collected numbers:", numbers);
+    console.log("Collected numbers:", ISSUE_LIST, "Next page URL:", nextPageURL, "Prev page URL:", prevPageURL);
 
+
+    // navigate to next/previous issue
     console.log(
-        direction === "next" ? "Fetching next issues..." : "Fetching previous issues..."
+        direction === "next" ? "Navigating to next issues..." : "Navigating to previous issues..."
     );
 
-    const currentIndex = numbers.indexOf(number);
+    const currentIndex = ISSUE_LIST.indexOf(number);
+    const targetNumber = getIssueNumber(ISSUE_LIST, currentIndex, direction);
+
+    if (targetNumber) {
+        console.log("Navigating to issue/PR number:", targetNumber);
+        if (listChanged) {
+            await saveIssueList(owner, repo, type, ISSUE_LIST, nextPageURL, prevPageURL);
+            console.log("Saved issue list to session storage.");
+        }
+        goToIssue(owner, repo, targetNumber);
+    } else {
+        if ((direction === "next" && !nextPageURL) || (direction === "prev" && !prevPageURL)) {
+            console.log("No more issues/PRs in this direction.");
+            return;
+        }
+        const { fetchedNumbers } = await fetchPageofNums(owner, repo, type, direction === "next" ? nextPageURL : prevPageURL);
+
+        if (fetchedNumbers.length === 0) {
+            console.log("No more issues/PRs in this direction.");
+            return;
+        }
+
+        listChanged = true;
+
+        if (direction === "next") {
+            ISSUE_LIST.push(...fetchedNumbers);
+        } else {
+            ISSUE_LIST.unshift(...fetchedNumbers);
+        }
+
+        const newTargetNumber = direction === "next" ? fetchedNumbers[0] : fetchedNumbers[fetchedNumbers.length - 1];
+        console.log("Navigating to issue/PR number from new page:", newTargetNumber);
+
+
+        if (listChanged) {
+            await saveIssueList(owner, repo, type, ISSUE_LIST, nextPageURL, prevPageURL);
+            console.log("Saved issue list to session storage.");
+        }
+
+        goToIssue(owner, repo, newTargetNumber);
+    }
 }
+
 
 function getIssueNumber(numbers, currentIndex, direction) {
     const nextIndex = currentIndex + 1;
     const prevIndex = currentIndex - 1;
-    if (direction === "next" && nextIndex < numbers.length) {
+    if (direction === "next" && nextIndex < numbers.length && nextIndex >= 0) {
         return numbers[nextIndex] || null;
     } else if (direction === "prev" && prevIndex >= 0) {
         return numbers[prevIndex] || null;
+    } else {
+        return null;
     }
 }
 
@@ -295,7 +375,14 @@ function makeFilterKey(owner, repo, type) {
     return `${owner}/${repo}/${type}:-${SETTINGS.status}-${SETTINGS.sort}-${SETTINGS.direction}`;
 }
 
-async function saveIssueList(owner, repo, type, numbers) {
+async function saveIssueList(owner, repo, type, numbers, nextPageURL, prevPageURL) {
     const key = makeFilterKey(owner, repo, type);
-    await SESSION.set({ [key]: { numbers } });
+    await SESSION.set({ [key]: { numbers, nextPageURL, prevPageURL } });
+}
+
+async function loadIssueList(owner, repo, type) {
+    const key = makeFilterKey(owner, repo, type);
+    const result = await SESSION.get(key);
+    console.log("Loaded from session:", result);
+    return result[key] ? result[key] : null;
 }
