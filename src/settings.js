@@ -16,6 +16,13 @@ export async function getSettings() {
     return { ...DEFAULT_SETTINGS, ...saved.SETTINGS };
 }
 
+export async function saveSettings(settingsToSave) {
+    console.log("Saving settings:", settingsToSave);
+    const currentSettings = await getSettings();
+    const settings = { ...currentSettings, ...settingsToSave };
+    await chrome.storage.sync.set({ SETTINGS: settings });
+}
+
 export function captureKeyCombo(e) {
     let keyCombo = []
 

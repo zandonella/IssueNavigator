@@ -1,4 +1,4 @@
-import { getSettings, captureKeyCombo, CLIENT_ID, hasToken, logout, getToken } from "./settings.js";
+import { getSettings, saveSettings, captureKeyCombo, CLIENT_ID, hasToken, logout, getToken } from "./settings.js";
 
 async function loadSettings() {
     const settings = await getSettings();
@@ -22,7 +22,7 @@ function setStatusMessage(message) {
     statusMessage.textContent = message;
 }
 
-async function saveSettings() {
+async function saveFormSettings() {
     const nextKey = document.querySelector("#nextKey").value.trim();
     const prevKey = document.querySelector("#prevKey").value.trim();
 
@@ -92,10 +92,8 @@ async function saveSettings() {
         direction
     };
 
-    console.log("Saving settings:", SETTINGS);
+    await saveSettings(SETTINGS);
     setStatusMessage();
-
-    await chrome.storage.sync.set({ SETTINGS });
 }
 
 function handleToggleButtonClick(button) {
@@ -225,6 +223,6 @@ prevKeyInput.addEventListener("keydown", (e) => {
     prevKeyInput.value = captureKeyCombo(e);
 });
 
-document.querySelector("#save").addEventListener("click", saveSettings);
+document.querySelector("#save").addEventListener("click", saveFormSettings);
 document.addEventListener("DOMContentLoaded", loadSettings);
 hasToken().then(updateAuthButton);

@@ -13,7 +13,7 @@ URL_REGEX = /\/([^\/]+)\/([^\/]+)\/(issues|pull|discussions)\/(\d+)/;
 
 (async () => {
     // dynamic import
-    ({ getSettings, captureKeyCombo, getToken } = await import(chrome.runtime.getURL("src/settings.js")));
+    ({ getSettings, saveSettings, captureKeyCombo, getToken } = await import(chrome.runtime.getURL("src/settings.js")));
 
     SETTINGS = await getSettings();
 
@@ -47,6 +47,7 @@ function onRouteChange() {
         lastPathname = currentPathname;
         console.log("Route changed to:", currentPathname);
         attachObserver();
+        getURLParams();
     }
 }
 
@@ -67,6 +68,7 @@ async function getURLParams() {
     if (params.has("q")) {
         const options = params.get("q");
         const decoded = decodeURIComponent(options);
+        console.log("Decoded q param:", decoded);
         const match = decoded.match(/sort:([^\s]+)/);
         if (match) {
             sortSetting = match[1];
