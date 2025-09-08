@@ -8,6 +8,8 @@ let SETTINGS;
 let getSettings;
 const SESSION = chrome.storage.session;
 let ISSUE_LIST = [];
+let STATES = [];
+let TYPES = []
 
 URL_REGEX = /\/([^\/]+)\/([^\/]+)\/(issues|pull|discussions)\/(\d+)/;
 
@@ -134,17 +136,10 @@ async function getAPIData(owner, repo, type, pageURL = null) {
     let URL;
     if (pageURL) {
         URL = pageURL;
-    } else if (type === "pull" && SETTINGS.type === "current") {
-        URL = buildRepoURL(owner, repo, "pulls", {
-            state: SETTINGS.status,
-            per_page: 50,
-            sort: SETTINGS.sort,
-            direction: SETTINGS.direction
-        });
     } else {
         URL = buildRepoURL(owner, repo, "issues", {
-            state: SETTINGS.status,
-            per_page: 50,
+            state: "all",
+            per_page: 100,
             sort: SETTINGS.sort,
             direction: SETTINGS.direction
         });
@@ -178,16 +173,16 @@ function parseHeaderLinks(header) {
     return links;
 }
 
-
+// TODO remove?     
 function filterAPIData(data, type, status) {
-    if (type === "issues" && SETTINGS.type === "current") {
-        data = data.filter(item => !item.pull_request);
-    }
-    if (status === "open") {
-        data = data.filter(item => item.state === "open");
-    } else if (status === "closed") {
-        data = data.filter(item => item.state === "closed");
-    }
+    // if (type === "issues" && SETTINGS.type === "current") {
+    //     data = data.filter(item => !item.pull_request);
+    // }
+    // if (status === "open") {
+    //     data = data.filter(item => item.state === "open");
+    // } else if (status === "closed") {
+    //     data = data.filter(item => item.state === "closed");
+    // }
 
     return data;
 }
@@ -195,8 +190,14 @@ function filterAPIData(data, type, status) {
 // navigation
 
 function goToIssue(owner, repo, number) {
+    if (!number) {
+        const url = `https://github.com/${owner}/${repo}/issues/`;
+        window.location.href = url;
+        return
+    }
     const url = `https://github.com/${owner}/${repo}/issues/${number}`;
     window.location.href = url;
+    return;
 }
 
 async function fetchPageofNums(owner, repo, type, pageURL = null) {
@@ -207,20 +208,30 @@ async function fetchPageofNums(owner, repo, type, pageURL = null) {
         pageURL
     );
 
-    fetchedNumbers = filterAPIData(apiData, type, SETTINGS.status).map(item => item.number);
+    const fetchedNumbers = apiData.map(item => item.number);
+    const fetchedStates = apiData.map(item => item.state);
+    const fetchedTypes = apiData.map(item => item.pull_request ? "pull" : "issues");
 
-    return { fetchedNumbers, next, prev };
+
+    console.log("Fetched numbers:", fetchedNumbers);
+    console.log("Fetched states:", fetchedStates);
+    console.log("Fetched types:", fetchedTypes);
+
+    return { fetchedNumbers, fetchedStates, fetchedTypes, next, prev };
 }
 
 async function findNumberInList(owner, repo, type, number, direction) {
     let nextPageURL = null;
     let prevPageURL = null;
     let numbers = [];
-    while (true) {
+    let states = [];
+    let types = [];
+    let i = 0;
+    while (i < 10) {
         console.log("Current number not in fetched data, fetching new page...");
 
-        const pageURL = direction === "next" ? nextPageURL : prevPageURL;
-        const { fetchedNumbers, next, prev } = await fetchPageofNums(
+        const pageURL = nextPageURL;
+        const { fetchedNumbers, fetchedStates, fetchedTypes, next, prev } = await fetchPageofNums(
             owner,
             repo,
             type,
@@ -228,6 +239,8 @@ async function findNumberInList(owner, repo, type, number, direction) {
         );
 
         numbers.push(...fetchedNumbers);
+        states.push(...fetchedStates);
+        types.push(...fetchedTypes);
         nextPageURL = next;
         prevPageURL = prev;
 
@@ -241,11 +254,10 @@ async function findNumberInList(owner, repo, type, number, direction) {
             console.log("Found current number in fetched data.");
             break;
         }
-
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        i++;
     }
 
-    return { numbers, nextPageURL, prevPageURL };
+    return { numbers, states, types, nextPageURL, prevPageURL };
 }
 
 async function navigate(direction) {
@@ -253,9 +265,7 @@ async function navigate(direction) {
         console.log("Invalid path");
         return;
     }
-
     const { owner, repo, type, number } = parseRepoPath(location.pathname);
-    console.log("Navigating in:", owner, repo, type);
 
     let nextPageURL = null;
     let prevPageURL = null;
@@ -265,78 +275,107 @@ async function navigate(direction) {
     let response = await loadIssueList(owner, repo, type);
     if (response) {
         ISSUE_LIST = response.numbers;
+        STATES = response.states;
+        TYPES = response.types;
         nextPageURL = response.nextPageURL;
         prevPageURL = response.prevPageURL;
-    } else {
+    }
+
+    if (!response || !ISSUE_LIST.includes(number)) {
         // fallback to API
         listChanged = true;
         response = await findNumberInList(owner, repo, type, number, direction);
         ISSUE_LIST = response.numbers;
+        STATES = response.states;
+        TYPES = response.types;
         nextPageURL = response.nextPageURL;
         prevPageURL = response.prevPageURL;
     }
 
-    console.log("Collected numbers:", ISSUE_LIST, "Next page URL:", nextPageURL, "Prev page URL:", prevPageURL);
-
-
+    console.log("Collected numbers:", ISSUE_LIST, "Collected states:", STATES, "Collected types:", TYPES, "Next page URL:", nextPageURL, "Prev page URL:", prevPageURL);
+    if (!ISSUE_LIST.includes(number)) {
+        console.log("Issue is too far from start of list, navigating to issue board...");
+        goToIssue(owner, repo);
+        return;
+    }
     // navigate to next/previous issue
-    console.log(
-        direction === "next" ? "Navigating to next issues..." : "Navigating to previous issues..."
-    );
-
     const currentIndex = ISSUE_LIST.indexOf(number);
-    const targetNumber = getIssueNumber(ISSUE_LIST, currentIndex, direction);
+    let targetNumber = getIssueNumber(ISSUE_LIST, currentIndex, direction, type);
 
     if (targetNumber) {
+        // number exists in the current list
         console.log("Navigating to issue/PR number:", targetNumber);
         if (listChanged) {
-            await saveIssueList(owner, repo, type, ISSUE_LIST, nextPageURL, prevPageURL);
+            await saveIssueList(owner, repo, type, ISSUE_LIST, STATES, TYPES, nextPageURL, prevPageURL);
             console.log("Saved issue list to session storage.");
         }
         goToIssue(owner, repo, targetNumber);
     } else {
-        if ((direction === "next" && !nextPageURL) || (direction === "prev" && !prevPageURL)) {
-            console.log("No more issues/PRs in this direction.");
+        // need to fetch more pages to find valid match
+        targetNumber = null;
+        let i = 0
+        while (i < 10 && ((direction === "next" && nextPageURL) || (direction === "prev" && prevPageURL))) {
+            console.log("Current target not found, fetching next page...");
+            const pageURL = direction === "next" ? nextPageURL : prevPageURL;
+            const { fetchedNumbers, fetchedStates, fetchedTypes, next, prev } = await fetchPageofNums(owner, repo, type, pageURL);
+
+            if (direction === "next") {
+                ISSUE_LIST.push(...fetchedNumbers);
+                STATES.push(...fetchedStates);
+                TYPES.push(...fetchedTypes);
+            } else {
+                ISSUE_LIST.unshift(...fetchedNumbers);
+                STATES.unshift(...fetchedStates);
+                TYPES.unshift(...fetchedTypes);
+            }
+            nextPageURL = next;
+            prevPageURL = prev;
+            listChanged = true;
+
+            const newTargetNumber = getIssueNumber(ISSUE_LIST, currentIndex, direction, type);
+
+            if (newTargetNumber) {
+                targetNumber = newTargetNumber;
+                break;
+            }
+            i++;
+        }
+
+        if (!targetNumber) {
+            console.log("No valid issue/PR found after fetching new page.");
             return;
         }
-        const { fetchedNumbers } = await fetchPageofNums(owner, repo, type, direction === "next" ? nextPageURL : prevPageURL);
-
-        if (fetchedNumbers.length === 0) {
-            console.log("No more issues/PRs in this direction.");
-            return;
-        }
-
-        listChanged = true;
-
-        if (direction === "next") {
-            ISSUE_LIST.push(...fetchedNumbers);
-        } else {
-            ISSUE_LIST.unshift(...fetchedNumbers);
-        }
-
-        const newTargetNumber = direction === "next" ? fetchedNumbers[0] : fetchedNumbers[fetchedNumbers.length - 1];
-        console.log("Navigating to issue/PR number from new page:", newTargetNumber);
-
 
         if (listChanged) {
-            await saveIssueList(owner, repo, type, ISSUE_LIST, nextPageURL, prevPageURL);
+            await saveIssueList(owner, repo, type, ISSUE_LIST, STATES, TYPES, nextPageURL, prevPageURL);
             console.log("Saved issue list to session storage.");
         }
 
-        goToIssue(owner, repo, newTargetNumber);
+        console.log("Navigating to issue/PR number from new page:", targetNumber);
+        goToIssue(owner, repo, targetNumber);
     }
 }
 
 
-function getIssueNumber(numbers, currentIndex, direction) {
-    const nextIndex = currentIndex + 1;
-    const prevIndex = currentIndex - 1;
-    if (direction === "next" && nextIndex < numbers.length && nextIndex >= 0) {
-        return numbers[nextIndex] || null;
-    } else if (direction === "prev" && prevIndex >= 0) {
-        return numbers[prevIndex] || null;
-    } else {
-        return null;
+function getIssueNumber(numbers, currentIndex, direction, type) {
+    let increment = direction === "next" ? 1 : -1;
+    let index = currentIndex + increment;
+    while (true) {
+        let typesMatch = false;
+        let statusMatch = false;
+        if (index < 0 || index >= numbers.length) {
+            return null;
+        }
+        if (STATES[index] === SETTINGS.status || SETTINGS.status === "all") {
+            statusMatch = true;
+        }
+        if (TYPES[index] === type || SETTINGS.type === "all") {
+            typesMatch = true;
+        }
+        if (statusMatch && typesMatch) {
+            return numbers[index];
+        }
+        index += increment;
     }
 }
 
@@ -374,12 +413,12 @@ function isTypingTarget(el) {
 // cache helpers
 
 function makeFilterKey(owner, repo, type) {
-    return `${owner}/${repo}/${type}:-${SETTINGS.status}-${SETTINGS.sort}-${SETTINGS.direction}`;
+    return `${owner}/${repo}\:-${SETTINGS.sort}-${SETTINGS.direction}`;
 }
 
-async function saveIssueList(owner, repo, type, numbers, nextPageURL, prevPageURL) {
+async function saveIssueList(owner, repo, type, numbers, states, types, nextPageURL, prevPageURL) {
     const key = makeFilterKey(owner, repo, type);
-    await SESSION.set({ [key]: { numbers, nextPageURL, prevPageURL } });
+    await SESSION.set({ [key]: { numbers, states, types, nextPageURL, prevPageURL } });
 }
 
 async function loadIssueList(owner, repo, type) {
