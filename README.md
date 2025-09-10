@@ -1,6 +1,6 @@
-# IssueNavigator
+# Issue Navigator
 
-IssueNavigator is a Chrome extension designed to enhance your GitHub experience by adding keybinds for seamless navigation between issue and pull request pages. This tool is particularly useful for maintainers and contributors who need to skim through issues efficiently.
+Issue Navigator is a Chrome extension designed to enhance your GitHub experience by adding keybinds for seamless navigation between issue and pull request pages. This tool is particularly useful for maintainers and contributors who need to skim through issues efficiently.
 
 ## Features
 
@@ -14,7 +14,7 @@ IssueNavigator is a Chrome extension designed to enhance your GitHub experience 
 - **Local Data Storage**: Uses Chrome storage to cache data locally, ensuring fast performance and data safety.
 - **GitHub Authentication**: Authenticate with GitHub for increased API rate limits, allowing for more extensive usage.
 
-## Why Use IssueNavigator?
+## Why Use Issue Navigator?
 
 - **Efficiency**: Quickly skim through newly posted issues or pull requests without manually navigating GitHub.
 - **Customization**: Tailor the navigation experience with advanced filtering options.
