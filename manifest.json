@@ -1,6 +1,6 @@
 {
     "name": "Issue Navigator",
-    "description": "Quickly navigate GitHub issues and PRs with keyboard shortcuts and filters",
+    "description": "Quickly navigate GitHub issues and pull requests with keyboard shortcuts and filters",
     "version": "0.1.0",
     "permissions": [
         "storage",
