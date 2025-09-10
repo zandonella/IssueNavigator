@@ -3,10 +3,12 @@
     "description": "Quickly navigate GitHub issues and pull requests with keyboard shortcuts and filters",
     "version": "0.1.0",
     "permissions": [
-        "storage",
-        "tabs"
+        "storage"
     ],
     "manifest_version": 3,
+    "host_permissions": [
+        "https://api.github.com/*"
+    ],
     "icons": {
         "16": "icons/icon16.png",
         "48": "icons/icon48.png",
@@ -16,10 +18,6 @@
         "service_worker": "src/background.js",
         "type": "module"
     },
-    "host_permissions": [
-        "https://github.com/*",
-        "https://api.github.com/*"
-    ],
     "action": {
         "default_popup": "src/index.html"
     },
