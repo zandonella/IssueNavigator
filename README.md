@@ -1,11 +1,10 @@
 # Issue Navigator
 
-Issue Navigator is a Chrome extension designed to enhance your GitHub experience by adding keybinds for seamless navigation between issue and pull request pages. This tool is particularly useful for maintainers and contributors who need to skim through issues efficiently.
+Issue Navigator is a Chrome extension designed to enhance your GitHub experience by adding keybinds for seamless navigation between issues and pull requests. This tool is particularly useful for maintainers and contributors who need to skim through issues efficiently.
 
 ## Features
 
 - **Keybind Navigation**: Easily navigate between issues and pull requests using keyboard shortcuts.
-- **Pagination Support**: Parses up to the most recent 1000 issues or pull requests by fetching up to 10 pages of data.
 - **Advanced Filtering**:
   - Restrict results to the current page type (issues or pull requests) or include all types.
   - Filter by open or closed state.
