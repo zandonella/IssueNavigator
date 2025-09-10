@@ -1,8 +1,10 @@
 import { getSettings, saveSettings, captureKeyCombo, CLIENT_ID, hasToken, logout, getToken } from "./settings.js";
 
+/**
+ *  Loads settings from storage and populates the form fields.
+ */
 async function loadSettings() {
     const settings = await getSettings();
-
     document.querySelector("#nextKey").value = settings.nextKey;
     document.querySelector("#prevKey").value = settings.prevKey;
 
@@ -16,16 +18,24 @@ async function loadSettings() {
     document.querySelector(`#sort-${settings.direction}`).classList.add("active");
 }
 
+/**
+ * Sets the status message displayed to the user.
+ * @param {string} message - The message to display.
+ */
 function setStatusMessage(message) {
     const statusMessage = document.querySelector("#status-message");
     statusMessage.style.display = message ? "block" : "none";
     statusMessage.textContent = message;
 }
 
+/**
+ * Saves the form settings to storage.
+ */
 async function saveFormSettings() {
     const nextKey = document.querySelector("#nextKey").value.trim();
     const prevKey = document.querySelector("#prevKey").value.trim();
 
+    // Gather toggle button states
     let type = null;
     if (document.querySelector("#restrict-all").classList.contains("active")) {
         type = "all";
@@ -58,6 +68,8 @@ async function saveFormSettings() {
         direction = "asc";
     }
 
+
+    // Validate inputs
     if (!nextKey || !prevKey) {
         setStatusMessage("Both Next and Prev keys must be set.");
         return;
@@ -96,6 +108,10 @@ async function saveFormSettings() {
     setStatusMessage();
 }
 
+/**
+ * Handles the click event for a toggle button.
+ * @param {HTMLElement} button - The clicked button element.
+ */
 function handleToggleButtonClick(button) {
     const buttonGroup = button.parentElement;
 
@@ -108,15 +124,21 @@ function handleToggleButtonClick(button) {
     button.classList.add("active");
 }
 
+/**
+ * Updates the authentication button based on the user's login status.
+ * @param {boolean} loggedIn - True if the user is logged in, false otherwise.
+ */
 function updateAuthButton(loggedIn) {
     const authButton = document.getElementById('authenticate');
     const text = document.getElementById("button-text");
     const icon = authButton.querySelector("svg");
     const divider = authButton.querySelector(".signup-divider");
 
-    authButton.onclick = null
+    // Clear previous onclick
+    authButton.onclick = null;
 
     if (loggedIn) {
+        // User is logged in, show logout button
         text.textContent = 'Logout';
         text.classList.remove('signup-text');
         text.classList.add('logout-text');
@@ -127,12 +149,14 @@ function updateAuthButton(loggedIn) {
         icon.classList.add('hidden');
         divider.classList.add('hidden');
 
+        // attach logout handler
         authButton.onclick = async () => {
             await logout();
             setStatusMessage('Signed out.');
             updateAuthButton(false);
         };
     } else {
+        // User is logged out, show login button
         text.textContent = 'Login with GitHub';
         text.classList.remove('logout-text');
         text.classList.add('signup-text');
@@ -143,6 +167,7 @@ function updateAuthButton(loggedIn) {
         icon.classList.remove('hidden');
         divider.classList.remove('hidden');
 
+        // attach login handler
         authButton.onclick = async () => {
             const deviceData = await getDeviceCode();
 
@@ -155,18 +180,17 @@ function updateAuthButton(loggedIn) {
             });
         };
     }
+    // update rate limit display
     getRateLimit();
 }
 
+/**
+ * Fetches the current GitHub API rate limit and updates the display.
+ */
 async function getRateLimit() {
     const token = await getToken();
-
     const headers = { 'Accept': 'application/vnd.github.v3+json', ...(token && { 'Authorization': `Bearer ${token}` }) };
-
-    console.log("Fetching rate limit with headers:", headers);
-
     const data = await fetch('https://api.github.com/rate_limit', { headers }).then(res => res.json());
-
 
     const rateInfo = data.resources.core;
     const remaining = rateInfo.remaining;
@@ -184,7 +208,10 @@ async function getRateLimit() {
 }
 
 // auth
-
+/**
+ * Initiates the device code flow to get a device code from GitHub.
+ * @returns {Promise<Object>} The device code response from GitHub.
+ */
 async function getDeviceCode() {
     const res = await fetch('https://github.com/login/device/code', {
         method: 'POST',
@@ -197,14 +224,12 @@ async function getDeviceCode() {
 // attach event listeners
 
 chrome.storage.onChanged.addListener(async (changes, area) => {
-
     hasToken().then(updateAuthButton);
 });
 
 const settingsContainer = document.querySelector("#settings");
 settingsContainer.addEventListener("click", (event) => {
     const button = event.target;
-
     if (button.classList.contains("toggle-button")) {
         handleToggleButtonClick(button);
     }

@@ -20,7 +20,6 @@ async function pollForToken(device_code) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    console.log("Background received message:", msg);
     if (msg.type === "start_poll") {
         pollForToken(msg.device_code)
             .then(token => {
