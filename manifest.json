@@ -1,6 +1,6 @@
 {
     "name": "Issue Navigator",
-    "description": "A Chrome extension for navigating GitHub issues",
+    "description": "Quickly navigate GitHub issues and PRs with keyboard shortcuts and filters",
     "version": "0.1.0",
     "permissions": [
         "storage",
